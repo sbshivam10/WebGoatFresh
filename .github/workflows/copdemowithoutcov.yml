@@ -1,0 +1,41 @@
+name: COP Coverity Scan
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+  workflow_dispatch:
+
+jobs:
+  polaris-scan:
+    runs-on: ubuntu-latest
+
+    env:
+      POLARIS_SERVER_URL: ${{ vars.COP_POLARIS_SERVER_URL }}
+      POLARIS_ACCESS_TOKEN: ${{ secrets.COP_POLARIS_ACCESS_TOKEN }}
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Set up JDK
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '25'
+          cache: maven
+
+          
+      - name: Test Maven build on Java 21 (outside Coverity)
+        run: mvn -B clean compile -DskipTests -Dspotless.check.skip=true
+
+      
+      - name: Download Polaris CLI
+        run: |
+          curl -fLsS -o polaris_cli.zip "$POLARIS_SERVER_URL/api/tools/polaris_cli-linux64.zip"
+          unzip -qo polaris_cli.zip -d /tmp
+          echo "$(ls -d /tmp/polaris_cli-*/bin)" >> $GITHUB_PATH
+
+      - name: Run Polaris analysis
+        run: polaris --co project.name=coptest analyze -w
